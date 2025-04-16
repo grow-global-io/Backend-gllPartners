@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="file"], input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        #statusMessage {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .loading {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>S3 File Upload Test</h1>
+    
+    <form id="uploadForm">
+        <div class="form-group">
+            <label for="fileInput">Select File:</label>
+            <input type="file" id="fileInput" name="file" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="fileType">File Type:</label>
+            <select id="fileType" name="type">
+                <option value="document">Document</option>
+                <option value="image">Image</option>
+                <option value="certificate">Certificate</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+        
+        <button type="submit">Upload File</button>
+    </form>
+    
+    <div id="statusMessage"></div>
+    
+    <div id="result">
+        <h3>Upload Result:</h3>
+        <pre id="resultContent"></pre>
+    </div>
+    
+    <script>
+        // First, test server connection
+        const statusMsg = document.getElementById('statusMessage');
+        statusMsg.style.display = 'block';
+        statusMsg.className = 'loading';
+        statusMsg.textContent = 'Checking server connection...';
+        
+        // Test server connection
+        fetch('http://localhost:8000/', { method: 'GET' })
+            .then(response => {
+                if (response.ok) {
+                    statusMsg.className = 'success';
+                    statusMsg.textContent = 'Server connection successful!';
+                    setTimeout(() => {
+                        statusMsg.style.display = 'none';
+                    }, 3000);
+                } else {
+                    statusMsg.className = 'error';
+                    statusMsg.textContent = 'Server connection error. Status: ' + response.status;
+                }
+            })
+            .catch(error => {
+                statusMsg.className = 'error';
+                statusMsg.textContent = 'Server connection failed: ' + error.message + '. Make sure the server is running on http://localhost:8000/';
+                console.error('Connection error:', error);
+            });
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('fileInput');
+            const fileType = document.getElementById('fileType').value;
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a file to upload');
+                return;
+            }
+            
+            formData.append('file', fileInput.files[0]);
+            formData.append('type', fileType);
+            
+            const statusMsg = document.getElementById('statusMessage');
+            statusMsg.style.display = 'block';
+            statusMsg.className = 'loading';
+            statusMsg.textContent = 'Uploading file...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/upload', {
+                    method: 'POST',
+                    body: formData,
+                    // Explicitly don't set Content-Type header - browser will set it with boundary for multipart/form-data
+                });
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    console.error('Failed to parse response as JSON:', e);
+                    data = { error: 'Invalid server response' };
+                }
+                
+                // Display result
+                document.getElementById('resultContent').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('result').style.display = 'block';
+                
+                if (response.ok) {
+                    statusMsg.className = 'success';
+                    statusMsg.textContent = 'File uploaded successfully!';
+                } else {
+                    statusMsg.className = 'error';
+                    statusMsg.textContent = 'Upload failed: ' + (data.error || response.statusText);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusMsg.className = 'error';
+                statusMsg.textContent = 'Upload failed: ' + error.message;
+                
+                document.getElementById('resultContent').textContent = JSON.stringify({ error: error.message }, null, 2);
+                document.getElementById('result').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 
